@@ -21,8 +21,8 @@ int16_t ax, ay, az;
 int16_t gx, gy, gz;
 
 
-const char* ssid = "<yourWLANhere>";
-const char* password = "foo";
+const char* ssid = "muccc.legacy-2.4GHz";
+const char* password = "haileris";
 int left = 0;
 int right = 0;
 String lastReq="";
@@ -36,6 +36,7 @@ WiFiServer server(80);
 //reads distance from an HC-SR04 sensor. Currently defined on GPIO 14 for TRIGGER
 //and ECHO on GPIO 12
 
+#if 0
 void handleMotor_manual(int a, int b){
   DBG_OUTPUT_PORT.printf("A:%d, B:%d\n",a,b);
 
@@ -45,6 +46,7 @@ void handleMotor_manual(int a, int b){
   digitalWrite(2, motorAForward); // was B
 
 }
+#endif
 long read_distance(){
   long duration, distance;
   digitalWrite(TRIGGER, LOW);  // Added this line
