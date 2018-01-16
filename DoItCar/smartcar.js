@@ -7,6 +7,14 @@ function move(left, right) {
      lastMove = now; 
      var request = new XMLHttpRequest();
      request.open('GET', '/engines/' + Math.round(left) + "," + Math.round(right), true);
+	 request.addEventListener('load', function(event) {
+      if (request.status >= 200 && request.status < 300) {
+         console.log(request.responseText);
+		 document.getElementById("EPSStatus").innerHTML =request.responseText;
+      } else {
+         console.warn(request.statusText, request.responseText);
+      }
+   });
      request.send(null);
   }
 }

@@ -1,3 +1,4 @@
+
 /*
  * This sketch lets you control an NodeMCU motorshield with attached engines
  * from a (smart phone) browser by using the orientation of the device.
@@ -12,12 +13,12 @@
 // specific I2C addresses may be passed as a parameter here
 // AD0 low = 0x68 (default for InvenSense evaluation board)
 // AD0 high = 0x69
+#define GYRO_ACTIVE
 MPU6050 accelgyro;
 //MPU6050 accelgyro(0x69); // <-- use for AD0 high
 
 int16_t ax, ay, az;
 int16_t gx, gy, gz;
-#define OUTPUT_READABLE_ACCELGYRO
 
 
 const char* ssid = "muccc.legacy-2.4GHz";
@@ -72,7 +73,8 @@ void initGyro(){
 void setup() {
   Serial.begin(115200);
   delay(10);
-  initGyro();
+  #ifdef GYRO_ACTIVE initGyro();
+  #endif
 
   // prepare GPIO2
   pinMode(2, OUTPUT);
@@ -212,7 +214,8 @@ void loop() {
     digitalWrite(0, motorAForward);
     digitalWrite(2, motorBForward);
     yield();
-    readGyro();
+    #ifdef GYRO_ACTIVE readGyro();
+    #endif
   } else if (req.indexOf("/index.html") != - 1 || req.indexOf("/") != - 1) {
     Serial.println("index.html");
     client.print("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n");
@@ -223,9 +226,11 @@ void loop() {
     client.print("<a href='#' onclick='move(\"b\");'>backwards</a><BR/>");
     client.print("<a href='#' onclick='move(\"l\");'>left</a><BR/>");
     client.print("<a href='#' onclick='move(\"r\");'>right</a><BR/>");
-    readGyroHTML();
+    #ifdef readGyroHTML();
+    #endif
     client.print("<div id=\"dmEvent\"/>");
     client.print("<div id=\"vector\"/>");
+	client.print("<div id=\"EPSStatus\"/>");
     client.print("</font></body></html>");
     analogWrite(5, 0);
     analogWrite(4, 0);
