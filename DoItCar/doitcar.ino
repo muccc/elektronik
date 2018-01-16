@@ -21,21 +21,45 @@ int16_t ax, ay, az;
 int16_t gx, gy, gz;
 
 
-const char* ssid = "muccc.legacy-2.4GHz";
-const char* password = "haileris";
+const char* ssid = "<yourWLANhere>";
+const char* password = "foo";
 int left = 0;
 int right = 0;
 String lastReq="";
 WiFiClient client;
-
+#define TRIGGER 14
+#define ECHO    12
 
 // Create an instance of the server
 // specify the port to listen on as an argument
 WiFiServer server(80);
+//reads distance from an HC-SR04 sensor. Currently defined on GPIO 14 for TRIGGER
+//and ECHO on GPIO 12
 
+void handleMotor_manual(int a, int b){
+  DBG_OUTPUT_PORT.printf("A:%d, B:%d\n",a,b);
+
+  analogWrite(5, abs(a));      // was left
+  analogWrite(4, abs(a));
+  digitalWrite(0, motorBForward); // was A
+  digitalWrite(2, motorAForward); // was B
+
+}
+long read_distance(){
+  long duration, distance;
+  digitalWrite(TRIGGER, LOW);  // Added this line
+  delayMicroseconds(2); // Added this line
+  digitalWrite(TRIGGER, HIGH);
+//  delayMicroseconds(1000); - Removed this line
+  delayMicroseconds(10); // Added this line
+  digitalWrite(TRIGGER, LOW);
+  duration = pulseIn(ECHO, HIGH);
+  distance = (duration/2) / 29.1;
+  return distance;
+}
 void initGyro(){
     Wire.begin(D5,D6);
-    
+
     // initialize device
     Serial.println("Initializing I2C devices...");
     accelgyro.initialize();
@@ -45,7 +69,7 @@ void initGyro(){
     Serial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
 
     // use the code below to change accel/gyro offset values
-    
+
     Serial.println("Updating internal sensor offsets...");
     // -76  -2359 1688  0 0 0
     Serial.print(accelgyro.getXAccelOffset()); Serial.print("\t"); // -76
@@ -79,22 +103,22 @@ void setup() {
   // prepare GPIO2
   pinMode(2, OUTPUT);
   digitalWrite(2, 0);
-  
+
   // Connect to WiFi network
   Serial.println();
   Serial.println();
   Serial.print("Connecting to ");
   Serial.println(ssid);
-  
+
   WiFi.begin(ssid, password);
-  
+
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
   Serial.println("");
   Serial.println("WiFi connected");
-  
+
   // Start the server
   server.begin();
   Serial.println("Server started");
@@ -109,10 +133,10 @@ void setup() {
 
   digitalWrite(5, 0);
   digitalWrite(4, 0);
-  
+
   digitalWrite(0, 1);
   digitalWrite(2, 1);
-  
+
 }
 
 void readGyro(){
@@ -154,7 +178,7 @@ void readGyroHTML(){
     client.print(gz);
     client.print("</td></tr>");
     client.print("<table><BR/><BR/>");
-      
+
 }
 
 void loop() {
@@ -167,23 +191,23 @@ void loop() {
     digitalWrite(2, 1);
     return;
   }
-  
+
   // Wait until the client sends some data
   //Serial.println("new client");
   while(!client.available()){
     delay(20);
   }
-  
+
   // Read the first line of the request
   String req = client.readStringUntil('\r');
-  
+
   client.flush();
   if (lastReq.equals(req)) {
     // the same command not again
     yield();
     return;
   }
-  Serial.println(req); 
+  Serial.println(req);
   // Match the request
   int motorASpeed = 1023;
   int motorBSpeed = 1023;
@@ -208,7 +232,7 @@ void loop() {
       motorBForward = 0;
     } else {
       motorBForward = 1;
-    }    
+    }
     analogWrite(5, abs(left));
     analogWrite(4, abs(right));
     digitalWrite(0, motorAForward);
@@ -238,9 +262,9 @@ void loop() {
     digitalWrite(2, 1);
     yield();
     return;
-  } 
+  }
 
-  
+
   client.flush();
 
   // Prepare the response
@@ -249,10 +273,9 @@ void loop() {
 
   // Send the response to the client
   client.print(s);
- 
+
   yield();
   delay(50);
-  // The client will actually be disconnected 
+  // The client will actually be disconnected
   // when the function returns and 'client' object is detroyed
 }
-
