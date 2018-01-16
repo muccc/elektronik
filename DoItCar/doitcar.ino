@@ -21,8 +21,8 @@ int16_t ax, ay, az;
 int16_t gx, gy, gz;
 
 
-const char* ssid = "<yourWLANhere>";
-const char* password = "foo";
+const char* ssid = "muccc.legacy-2.4GHz";
+const char* password = "haileris";
 int left = 0;
 int right = 0;
 String lastReq="";
