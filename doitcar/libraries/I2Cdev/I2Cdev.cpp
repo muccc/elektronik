@@ -87,6 +87,10 @@ THE SOFTWARE.
 
 #endif
 
+#ifndef min
+#define min(a, b) ((a < b) ? a : b)
+#endif
+
 /** Default constructor.
  */
 I2Cdev::I2Cdev() {
