@@ -1,4 +1,3 @@
-
 /*
  * This sketch lets you control an NodeMCU motorshield with attached engines
  * from a (smart phone) browser by using the orientation of the device.
@@ -9,32 +8,138 @@
 #include "MPU6050.h"
 #include "Wire.h"
 
-// class default I2C address is 0x68
-// specific I2C addresses may be passed as a parameter here
-// AD0 low = 0x68 (default for InvenSense evaluation board)
-// AD0 high = 0x69
-#define GYRO_ACTIVE
-MPU6050 accelgyro;
-//MPU6050 accelgyro(0x69); // <-- use for AD0 high
-
-int16_t ax, ay, az;
-int16_t gx, gy, gz;
-
-
 const char* ssid = "muccc.legacy-2.4GHz";
 const char* password = "haileris";
-int left = 0;
-int right = 0;
-String lastReq="";
-WiFiClient client;
-#define TRIGGER 14
-#define ECHO    12
 
-// Create an instance of the server
-// specify the port to listen on as an argument
-WiFiServer server(80);
-//reads distance from an HC-SR04 sensor. Currently defined on GPIO 14 for TRIGGER
-//and ECHO on GPIO 12
+
+class Motor {
+    public:
+        Motor(int gpio_d, int gpio_a, bool reverse);
+        void update(void);
+        void setSpeed(int speed);
+
+    private:
+        int speed = 0;
+        int gpio_d;
+        int gpio_a;
+        unsigned long int lastUpdate = 0;
+        unsigned long int lastApplied = 0;
+        bool reverse;
+};
+
+class WebServer {
+    public:
+        WebServer(Motor *motorLeft, Motor *motorRight);
+        ~WebServer(void);
+        void update(void);
+
+    private:
+        void printIndex(WiFiClient* client);
+        void engine(String req);
+        WiFiServer *server;
+        Motor *motorLeft;
+        Motor *motorRight;
+};
+
+WebServer::WebServer(Motor *motorLeft, Motor *motorRight)
+{
+    this->motorLeft = motorLeft;
+    this->motorRight = motorRight;
+
+    server = new WiFiServer(80);
+    server->begin();
+}
+
+WebServer::~WebServer(void)
+{
+    server->stop();
+    delete server;
+}
+
+void WebServer::printIndex(WiFiClient *client)
+{
+    client->print("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n");
+    client->print("<html><head>");
+    client->print("</head><body><font size=\"6\">");
+    client->print("<script type='text/javascript' src='http://www.squix.org/blog/smartcar.js'></script>");
+    client->print("<a href='#' onclick='move(\"f\");'>forward</a><BR/>");
+    client->print("<a href='#' onclick='move(\"b\");'>backwards</a><BR/>");
+    client->print("<a href='#' onclick='move(\"l\");'>left</a><BR/>");
+    client->print("<a href='#' onclick='move(\"r\");'>right</a><BR/>");
+    client->print("<div id=\"dmEvent\"/>");
+    client->print("<div id=\"vector\"/>");
+    client->print("<div id=\"EPSStatus\"/>");
+    client->print("</font></body></html>");
+}
+
+void WebServer::engine(String req)
+{
+    String parameters = req.substring(13);
+    int separatorPos = parameters.indexOf(",");
+    int httpPos = parameters.indexOf(" HTTP");
+    String leftText = parameters.substring(0, separatorPos);
+    String rightText = parameters.substring(separatorPos + 1, httpPos);
+
+    Serial.println("[" + leftText +"][" + rightText + "]");
+
+    motorLeft->setSpeed(leftText.toInt());
+    motorRight->setSpeed(rightText.toInt());
+}
+
+void WebServer::update(void)
+{
+    WiFiClient client = server->available();
+
+    if (!client.available())
+        return;
+
+    // Read the first line of the request
+    String req = client.readStringUntil('\r');
+
+    client.flush();
+
+    if (req.indexOf("/index.html ") != - 1 || req.indexOf("/ ") != - 1) {
+        printIndex(&client);
+    } else if (req.indexOf("/engines/") != -1) {
+        engine(req);
+    }
+}
+
+
+Motor::Motor(int gpio_d, int gpio_a, bool reverse)
+{
+    this->gpio_d = gpio_d;
+    this->gpio_a = gpio_a;
+    this->reverse = reverse;
+
+    pinMode(gpio_d, OUTPUT);
+    pinMode(gpio_a, OUTPUT);
+    digitalWrite(gpio_d, HIGH);
+    digitalWrite(gpio_a, LOW);
+}
+
+void Motor::setSpeed(int speed)
+{
+    this->speed = speed;
+    lastUpdate = millis();
+}
+
+void Motor::update(void)
+{
+    unsigned long now = millis();
+
+    if (lastUpdate > lastApplied) {
+        if (speed < 0) {
+            digitalWrite(gpio_d, reverse ? HIGH : LOW);
+        } else {
+            digitalWrite(gpio_d, reverse ? LOW : HIGH);
+        }
+        analogWrite(gpio_a, abs(speed));
+        lastApplied = now;
+    } else if (lastApplied + 500 <  now) {
+        analogWrite(gpio_a, 0);
+    }
+}
 
 #if 0
 void handleMotor_manual(int a, int b){
@@ -47,6 +152,7 @@ void handleMotor_manual(int a, int b){
 
 }
 #endif
+#if 0
 long read_distance(){
   long duration, distance;
   digitalWrite(TRIGGER, LOW);  // Added this line
@@ -59,6 +165,9 @@ long read_distance(){
   distance = (duration/2) / 29.1;
   return distance;
 }
+#endif
+
+#if 0
 void initGyro(){
     Wire.begin(D5,D6);
 
@@ -95,52 +204,9 @@ void initGyro(){
     Serial.print(accelgyro.getZGyroOffset()); Serial.print("\t"); // 0
     Serial.print("\n");
 }
+#endif
 
-void setup() {
-  Serial.begin(115200);
-  delay(10);
-  #ifdef GYRO_ACTIVE initGyro();
-  #endif
-
-  // prepare GPIO2
-  pinMode(2, OUTPUT);
-  digitalWrite(2, 0);
-
-  // Connect to WiFi network
-  Serial.println();
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-
-  WiFi.begin(ssid, password);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.println("WiFi connected");
-
-  // Start the server
-  server.begin();
-  Serial.println("Server started");
-
-  // Print the IP address
-  Serial.println(WiFi.localIP());
-
-  pinMode(5, OUTPUT);
-  pinMode(4, OUTPUT);
-  pinMode(0, OUTPUT);
-  pinMode(2, OUTPUT);
-
-  digitalWrite(5, 0);
-  digitalWrite(4, 0);
-
-  digitalWrite(0, 1);
-  digitalWrite(2, 1);
-
-}
-
+#if 0
 void readGyro(){
   accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
 
@@ -152,7 +218,9 @@ void readGyro(){
         Serial.print(gy); Serial.print("\t");
         Serial.println(gz);
 }
+#endif
 
+#if 0
 void readGyroHTML(){
     accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
 
@@ -180,104 +248,44 @@ void readGyroHTML(){
     client.print(gz);
     client.print("</td></tr>");
     client.print("<table><BR/><BR/>");
+}
+#endif
 
+
+Motor *motorLeft;
+Motor *motorRight;
+WebServer *web;
+
+void setup() {
+    Serial.begin(115200);
+    delay(10);
+
+    // Connect to WiFi network
+    Serial.println();
+    Serial.print("Connecting to ");
+    Serial.println(ssid);
+
+    WiFi.begin(ssid, password);
+
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("");
+    Serial.println("WiFi connected");
+
+    // Print the IP address
+    Serial.println(WiFi.localIP());
+
+    motorLeft = new Motor(0, 5, true);
+    motorRight = new Motor(2, 4, false);
+    web = new WebServer(motorLeft, motorRight);
+
+    Serial.println("Server started");
 }
 
 void loop() {
-  // Check if a client has connected
-  client = server.available();
-  if (!client) {
-    analogWrite(5, 0);
-    analogWrite(4, 0);
-    digitalWrite(0, 1);
-    digitalWrite(2, 1);
-    return;
-  }
-
-  // Wait until the client sends some data
-  //Serial.println("new client");
-  while(!client.available()){
-    delay(20);
-  }
-
-  // Read the first line of the request
-  String req = client.readStringUntil('\r');
-
-  client.flush();
-  if (lastReq.equals(req)) {
-    // the same command not again
-    yield();
-    return;
-  }
-  Serial.println(req);
-  // Match the request
-  int motorASpeed = 1023;
-  int motorBSpeed = 1023;
-  int motorAForward = 1;
-  int motorBForward = 1;
-  if (req.indexOf("/engines/") != -1) {
-    String parameters = req.substring(13);
-    int separatorPos = parameters.indexOf(",");
-    int httpPos = parameters.indexOf(" HTTP");
-    String leftText = parameters.substring(0,separatorPos);
-    String rightText = parameters.substring(separatorPos + 1, httpPos);
-
-    Serial.println("[" + leftText +"][" + rightText + "]");
-    left = leftText.toInt();
-    right = rightText.toInt();
-    if (left < 0) {
-      motorAForward = 0;
-    } else {
-      motorAForward = 1;
-    }
-    if (right < 0) {
-      motorBForward = 0;
-    } else {
-      motorBForward = 1;
-    }
-    analogWrite(5, abs(left));
-    analogWrite(4, abs(right));
-    digitalWrite(0, motorAForward);
-    digitalWrite(2, motorBForward);
-    yield();
-    #ifdef GYRO_ACTIVE readGyro();
-    #endif
-  } else if (req.indexOf("/index.html") != - 1 || req.indexOf("/") != - 1) {
-    Serial.println("index.html");
-    client.print("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n");
-    client.print("<html><head>");
-    client.print("</head><body><font size=\"6\">");
-    client.print("<script type='text/javascript' src='http://www.squix.org/blog/smartcar.js'></script>");
-    client.print("<a href='#' onclick='move(\"f\");'>forward</a><BR/>");
-    client.print("<a href='#' onclick='move(\"b\");'>backwards</a><BR/>");
-    client.print("<a href='#' onclick='move(\"l\");'>left</a><BR/>");
-    client.print("<a href='#' onclick='move(\"r\");'>right</a><BR/>");
-    #ifdef readGyroHTML();
-    #endif
-    client.print("<div id=\"dmEvent\"/>");
-    client.print("<div id=\"vector\"/>");
-	client.print("<div id=\"EPSStatus\"/>");
-    client.print("</font></body></html>");
-    analogWrite(5, 0);
-    analogWrite(4, 0);
-    digitalWrite(0, 1);
-    digitalWrite(2, 1);
-    yield();
-    return;
-  }
-
-
-  client.flush();
-
-  // Prepare the response
-  String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>\r\nGPIO is now ";
-  s += "</html>\n";
-
-  // Send the response to the client
-  client.print(s);
-
-  yield();
-  delay(50);
-  // The client will actually be disconnected
-  // when the function returns and 'client' object is detroyed
+    motorLeft->update();
+    motorRight->update();
+    web->update();
 }
