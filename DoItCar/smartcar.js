@@ -7,6 +7,10 @@ function move(left, right) {
      lastMove = now; 
      var request = new XMLHttpRequest();
      request.open('GET', '/engines/' + Math.round(left) + "," + Math.round(right), true);
+	 
+	 const requestString = '/engines/' + Math.round(left) + "," + Math.round(right);
+	 document.getElementById("dmEvent").innerHTML = requestString;
+	 
 	 request.addEventListener('load', function(event) {
       if (request.status >= 200 && request.status < 300) {
          console.log(request.responseText);
@@ -25,6 +29,7 @@ document.onkeydown = function detectKey(event) {
     if (e==65){ move(-600, 600);}
     if (e==68){ move(-600, -600);}
 }
+
 if (window.DeviceMotionEvent) {
   window.addEventListener('devicemotion', deviceMotionHandler, false);
 } else {
