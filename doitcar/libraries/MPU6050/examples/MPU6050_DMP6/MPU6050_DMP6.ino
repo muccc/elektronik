@@ -118,6 +118,7 @@ MPU6050 mpu;
 
 
 
+#define INTERRUPT_PIN 2  // use pin 2 on Arduino Uno & most boards
 #define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
 bool blinkState = false;
 
@@ -162,7 +163,7 @@ void setup() {
     // join I2C bus (I2Cdev library doesn't do this automatically)
     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
         Wire.begin();
-        TWBR = 24; // 400kHz I2C clock (200kHz if CPU is 8MHz)
+        Wire.setClock(400000); // 400kHz I2C clock. Comment this line if having compilation difficulties
     #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
         Fastwire::setup(400, true);
     #endif
@@ -173,8 +174,8 @@ void setup() {
     Serial.begin(115200);
     while (!Serial); // wait for Leonardo enumeration, others continue immediately
 
-    // NOTE: 8MHz or slower host processors, like the Teensy @ 3.3v or Ardunio
-    // Pro Mini running at 3.3v, cannot handle this baud rate reliably due to
+    // NOTE: 8MHz or slower host processors, like the Teensy @ 3.3V or Arduino
+    // Pro Mini running at 3.3V, cannot handle this baud rate reliably due to
     // the baud timing being too misaligned with processor ticks. You must use
     // 38400 or slower in these cases, or use some kind of external separate
     // crystal solution for the UART timer.
@@ -182,6 +183,7 @@ void setup() {
     // initialize device
     Serial.println(F("Initializing I2C devices..."));
     mpu.initialize();
+    pinMode(INTERRUPT_PIN, INPUT);
 
     // verify connection
     Serial.println(F("Testing device connections..."));
@@ -211,7 +213,7 @@ void setup() {
 
         // enable Arduino interrupt detection
         Serial.println(F("Enabling interrupt detection (Arduino external interrupt 0)..."));
-        attachInterrupt(0, dmpDataReady, RISING);
+        attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
         mpuIntStatus = mpu.getIntStatus();
 
         // set our DMP Ready flag so the main loop() function knows it's okay to use it
